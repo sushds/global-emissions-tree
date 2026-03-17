@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global GHG Emissions — Causal Tree</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060c14;
+    --surface: #0c1522;
+    --surface2: #111d2e;
+    --border: #1a2d42;
+    --text: #c8d8e8;
+    --text-dim: #5a7a96;
+    --text-bright: #e8f4ff;
+    --energy: #f97316;
+    --afolu: #10b981;
+    --industry: #3b82f6;
+    --waste: #a855f7;
+    --root: #94a3b8;
+    --conf-high: #22c55e;
+    --conf-med: #f59e0b;
+    --conf-low: #ef4444;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Outfit', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.08) 0%, transparent 60%),
+      linear-gradient(rgba(26,45,66,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,45,66,0.3) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+  }
+
+  header {
+    padding: 36px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(12,21,34,0.95) 0%, rgba(6,12,20,0.7) 100%);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .header-top {
+    display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: 22px; font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: -0.3px;
+  }
+
+  h1 span { color: var(--text-dim); font-weight: 300; font-size: 16px; margin-left: 8px; }
+
+  .meta-pills {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+  }
+
+  .pill {
+    font-family: var(--mono);
+    font-size: 11px; padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-dim);
+    background: var(--surface);
+  }
+
+  .pill.highlight { color: var(--text); border-color: #2a4060; background: var(--surface2); }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px;
+  }
+
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* TREE */
+
+  .tree-container {
+    padding: 32px 40px 60px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .node-wrapper {
+    position: relative;
+    margin-left: 0;
+  }
+
+  .node-wrapper.child-node {
+    margin-left: 28px;
+    border-left: 1px solid var(--border);
+    padding-left: 0;
+  }
+
+  .node-wrapper.child-node::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 22px;
+    width: 20px; height: 1px;
+    background: var(--border);
+  }
+
+  .node-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    margin: 3px 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: transparent;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .node-header::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 4px 0 0 4px;
+    opacity: 0; transition: opacity 0.2s;
+  }
+
+  .node-header:hover {
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+
+  .node-header:hover::before { opacity: 1; }
+  .node-header.expanded { background: var(--surface); border-color: var(--border); }
+  .node-header.expanded::before { opacity: 1; }
+
+  .expand-btn {
+    width: 18px; height: 18px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    background: var(--surface);
+  }
+
+  .node-header.expanded .expand-btn {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  .no-children-indicator {
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 9px;
+    color: var(--text-dim);
+    opacity: 0.5;
+  }
+
+  .node-color-bar {
+    width: 4px; height: 28px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
+
+  .node-name {
+    flex: 1;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text);
+    min-width: 0;
+  }
+
+  .node-name .note-inline {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 300;
+    margin-left: 6px;
+  }
+
+  .node-pct {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  .node-bar-wrapper {
+    width: 100px; flex-shrink: 0;
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .node-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .conf-badge {
+    font-family: var(--mono);
+    font-size: 9px; padding: 2px 6px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+
+  .conf-high { color: var(--conf-high); border: 1px solid rgba(34,197,94,0.25); background: rgba(34,197,94,0.08); }
+  .conf-med  { color: var(--conf-med);  border: 1px solid rgba(245,158,11,0.25); background: rgba(245,158,11,0.08); }
+  .conf-low  { color: var(--conf-low);  border: 1px solid rgba(239,68,68,0.25);  background: rgba(239,68,68,0.08);  }
+
+  /* Node detail panel */
+  .node-detail {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 12px 16px 14px;
+    margin: 0 0 2px 0;
+    font-size: 12px;
+  }
+
+  .node-detail.visible { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px 20px;
+  }
+
+  .detail-item label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+    font-family: var(--mono);
+  }
+
+  .detail-item span {
+    color: var(--text-bright);
+    font-size: 12px;
+  }
+
+  .detail-item a {
+    color: #5b9bd5;
+    text-decoration: none;
+  }
+  .detail-item a:hover { text-decoration: underline; }
+
+  .stop-note {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.18);
+    border-radius: 3px;
+    font-size: 11px;
+    color: #f87171;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+
+  /* Children container */
+  .node-children {
+    display: none;
+    margin-top: 2px;
+  }
+
+  .node-children.visible { display: block; }
+
+  /* Root special */
+  .root-node .node-header {
+    background: var(--surface2);
+    border-color: #1e3350;
+    padding: 14px 18px;
+  }
+  .root-node .node-name { font-size: 15px; font-weight: 600; }
+  .root-node .node-pct { font-size: 16px; }
+
+  /* Sources panel */
+  .sources-panel {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 40px 60px;
+  }
+
+  .panel-toggle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-dim);
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .panel-toggle:hover { color: var(--text); border-color: #2a4060; }
+
+  .panel-body {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .panel-body.visible { display: block; }
+
+  .sources-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .source-row {
+    display: flex; gap: 16px; align-items: flex-start;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .source-row:last-child { border-bottom: none; }
+
+  .source-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 24px;
+    padding-top: 2px;
+  }
+
+  .source-content { flex: 1; }
+  .source-content strong { color: var(--text-bright); font-weight: 600; }
+  .source-content p { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .source-content a { color: #5b9bd5; text-decoration: none; font-size: 12px; }
+
+  /* Search methodology */
+  .methodology-section {
+    max-width: 1100px; margin: 0 auto;
+    padding: 0 40px 60px;
+  }
+
+  .method-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px; padding: 20px; background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none; border-radius: 0 0 4px 4px;
+  }
+
+  .method-card {
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .method-card h4 {
+    font-size: 12px; font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    background: rgba(59,130,246,0.15);
+    border: 1px solid rgba(59,130,246,0.3);
+    color: #60a5fa;
+    border-radius: 2px;
+  }
+
+  .method-card p { font-size: 11.5px; color: var(--text-dim); line-height: 1.7; }
+  .method-card a { color: #5b9bd5; text-decoration: none; }
+
+  /* Caveat box */
+  .caveat-box {
+    margin: 0 40px 20px;
+    max-width: 1100px;
+    margin-left: auto; margin-right: auto;
+    padding: 14px 18px;
+    background: rgba(245,158,11,0.05);
+    border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .caveat-box strong { color: #f59e0b; }
+
+  @media (max-width: 700px) {
+    header, .tree-container, .sources-panel, .methodology-section { padding-left: 16px; padding-right: 16px; }
+    .node-bar-wrapper { display: none; }
+    h1 { font-size: 18px; }
+    .caveat-box { margin-left: 16px; margin-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div>
+      <h1>Global GHG Emissions <span>Causal Breakdown Tree</span></h1>
+    </div>
+  </div>
+  <div class="meta-pills">
+    <span class="pill highlight">⊕ 59 GtCO₂e total · 2019 baseline</span>
+    <span class="pill">Source: IPCC AR6 WG3 + Climate Watch / WRI</span>
+    <span class="pill">Click any node to expand</span>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--energy)"></div>Energy (73.2%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--afolu)"></div>Agriculture / Land (18.4%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--industry)"></div>Industrial Processes (5.2%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--waste)"></div>Waste (3.2%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--conf-high)"></div>High confidence</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--conf-med)"></div>Medium confidence</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--conf-low)"></div>Low / estimated</div>
+  </div>
+</header>
+
+<div style="height:20px"></div>
+
+<div class="caveat-box">
+  <strong>⚠ Important framing:</strong> This tree uses <strong>all GHGs expressed in CO₂ equivalent (GtCO₂e)</strong> — not pure fossil CO₂ only (~36.8 Gt in 2022, Global Carbon Project). The broader GHG view includes methane (CH₄) and nitrous oxide (N₂O), which are essential to understanding agriculture and waste correctly. Where the tree stops drilling down, that is a genuine data reliability limit — sector-specific databases exist but do not reconcile cleanly to a single global accounting framework at that granularity.
+</div>
+
+<div class="tree-container" id="tree-root"></div>
+
+<div class="sources-panel">
+  <div class="panel-toggle" onclick="togglePanel('sources-body', this)">
+    <span>▶</span> <strong>Full source references</strong> — 8 primary sources
+  </div>
+  <div class="panel-body" id="sources-body">
+    <div class="sources-list">
+      <div class="source-row">
+        <div class="source-num">[1]</div>
+        <div class="source-content">
+          <strong>IPCC Sixth Assessment Report, Working Group III (AR6 WG3), 2022</strong>
+          <p>Chapter 2: Emissions trends and drivers. The authoritative global GHG accounting framework. Used for top-level and sector-level totals.</p>
+          <a href="https://www.ipcc.ch/report/ar6/wg3/" target="_blank">ipcc.ch/report/ar6/wg3/</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[2]</div>
+        <div class="source-content">
+          <strong>Climate Watch / World Resources Institute (WRI), 2019 data</strong>
+          <p>CAIT database. Primary source for level 1 and level 2 sector percentages. Used by Our World in Data and widely cited in policy documents.</p>
+          <a href="https://www.climatewatchdata.org/" target="_blank">climatewatchdata.org</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[3]</div>
+        <div class="source-content">
+          <strong>Our World in Data — "Emissions by Sector" (Hannah Ritchie & Max Roser)</strong>
+          <p>Aggregation and visualization of Climate Watch / WRI data. Used for level 2 breakdowns within Energy and AFOLU sectors.</p>
+          <a href="https://ourworldindata.org/emissions-by-sector" target="_blank">ourworldindata.org/emissions-by-sector</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[4]</div>
+        <div class="source-content">
+          <strong>IEA World Energy Outlook 2023 / IEA CO₂ Emissions from Fuel Combustion</strong>
+          <p>Used for level 3 breakdowns within transport subsectors and industrial energy sub-sectors. Energy-specific, does not cover process emissions.</p>
+          <a href="https://www.iea.org/reports/world-energy-outlook-2023" target="_blank">iea.org (summary free, full report paywalled)</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[5]</div>
+        <div class="source-content">
+          <strong>Global Carbon Project — Global Carbon Budget 2023</strong>
+          <p>Published in Earth System Science Data (open access). Used for pure fossil CO₂ reference (~36.8 Gt 2022) and land-use emissions validation.</p>
+          <a href="https://essd.copernicus.org/articles/15/5301/2023/" target="_blank">essd.copernicus.org</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[6]</div>
+        <div class="source-content">
+          <strong>FAO FAOSTAT — Agrifood Systems Emissions</strong>
+          <p>Used for livestock enteric fermentation and manure management sub-splits. Freely accessible emissions database by country and subsector.</p>
+          <a href="https://www.fao.org/faostat/en/#data" target="_blank">fao.org/faostat</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[7]</div>
+        <div class="source-content">
+          <strong>Global Cement & Concrete Association (GCCA) — Getting the Numbers Right, 2022</strong>
+          <p>Used for cement process emissions (~3% of global GHGs). Industry self-reported data, methodologically consistent with IPCC Tier 1/2 approach.</p>
+          <a href="https://gccassociation.org/sustainability-innovation/gnr-gcca-in-numbers/" target="_blank">gccassociation.org</a>
+        </div>
+      </div>
+      <div class="source-row">
+        <div class="source-num">[8]</div>
+        <div class="source-content">
+          <strong>IMO (International Maritime Organization) — Fourth GHG Study 2020</strong>
+          <p>Used for shipping emissions. IMO estimates ~1.7% of global GHGs for international shipping.</p>
+          <a href="https://www.imo.org/en/OurWork/Environment/Pages/Fourth-IMO-Greenhouse-Gas-Study-2020.aspx" target="_blank">imo.org</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:16px"></div>
+
+  <div class="panel-toggle" onclick="togglePanel('method-body', this)">
+    <span>▶</span> <strong>How I would search for this data</strong> — methodology walkthrough
+  </div>
+  <div class="panel-body" id="method-body">
+    <div class="method-grid">
+      <div class="method-card">
+        <h4><span class="step-num">01</span> Start with IPCC AR6 WG3</h4>
+        <p>Chapter 2 of the Working Group III report gives the most defensible global top-level breakdown. Free PDF. The "Summary for Policymakers" has the headline numbers; Chapter 2 has the sectoral detail. This anchors the 100% baseline.</p>
+      </div>
+      <div class="method-card">
+        <h4><span class="step-num">02</span> Our World in Data as your index</h4>
+        <p>Hannah Ritchie's "Emissions by sector" article is the fastest way to find level 2 numbers with source trails. Every chart links to the underlying Climate Watch / WRI CAIT database. Use it as a lookup layer, not the primary citation.</p>
+      </div>
+      <div class="method-card">
+        <h4><span class="step-num">03</span> IEA for energy sub-sectors</h4>
+        <p>The IEA's annual "CO₂ Emissions from Fuel Combustion" goes 3–4 levels deep within energy (transport modes, industrial subsectors, building types). The executive summary is free; full data requires a license. Cross-check with IEA's <a href="https://www.iea.org/data-and-statistics" target="_blank">data portal</a>.</p>
+      </div>
+      <div class="method-card">
+        <h4><span class="step-num">04</span> FAO FAOSTAT for agriculture</h4>
+        <p>The FAOSTAT Agrifood emissions module lets you download by subsector (enteric fermentation, manure, rice, soils, burning) by country and year. Free. It's the source that reconciles best with IPCC for AFOLU at level 3.</p>
+      </div>
+      <div class="method-card">
+        <h4><span class="step-num">05</span> Sector-specific industry bodies for level 3+</h4>
+        <p>For cement: GCCA's "Getting the Numbers Right." For steel: worldsteel.org. For aviation: ICAO's Carbon Emissions Calculator and annual environmental report. For shipping: IMO GHG Study. These are the deepest publicly reconcilable sources.</p>
+      </div>
+      <div class="method-card">
+        <h4><span class="step-num">06</span> Where to stop — the fragmentation problem</h4>
+        <p>Below level 3, global data fractures into national inventories (UNFCCC submissions), company-level CDP disclosures, and academic estimates that don't reconcile to a common denominator. You can find a number for "emissions from baking bread" — but it won't meaningfully add back up to 100% of global GHGs. That's where this tree stops.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const C = { energy: '#f97316', afolu: '#10b981', industry: '#3b82f6', waste: '#a855f7', root: '#94a3b8' };
+
+const TREE = {
+  name: "Global GHG Emissions",
+  pct: 100, abs: "59 GtCO₂e",
+  year: "2019",
+  source: "IPCC AR6 WG3 (2022) + Climate Watch/WRI",
+  sourceRef: "[1][2]",
+  conf: "high",
+  note: "All greenhouse gases in CO₂ equivalent. Includes CO₂, CH₄, N₂O, F-gases.",
+  color: C.root,
+  stopReason: null,
+  children: [
+    {
+      name: "Energy",
+      pct: 73.2, abs: "~43.2 GtCO₂e",
+      source: "Climate Watch / WRI (2019) via Our World in Data",
+      sourceRef: "[2][3]",
+      conf: "high",
+      note: "All emissions from burning fossil fuels for electricity, heat, transport, and industrial processes.",
+      color: C.energy,
+      stopReason: null,
+      children: [
+        {
+          name: "Energy use in industry",
+          pct: 24.2, abs: "~14.3 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "high",
+          note: "Combustion of fossil fuels in manufacturing, mining, construction.",
+          color: C.energy,
+          stopReason: null,
+          children: [
+            {
+              name: "Iron & Steel",
+              pct: 6.7, abs: "~4.0 GtCO₂e",
+              source: "IEA World Energy Outlook 2023",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Includes blast furnace coke combustion. ~25% of industrial energy use globally.",
+              color: C.energy,
+              stopReason: "Sub-steel breakdown (e.g. scrap vs virgin routes) exists at plant level but no globally reconciled public dataset.",
+              children: null
+            },
+            {
+              name: "Chemicals & Petrochemicals",
+              pct: 5.0, abs: "~2.9 GtCO₂e",
+              source: "IEA World Energy Outlook 2023",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Feedstock + fuel combustion in plastics, fertilisers, pharma. Does not include N₂O from nitric acid (that is in Industrial Processes).",
+              color: C.energy,
+              stopReason: "Sub-sector (e.g. ethylene vs ammonia energy) not reconcilable globally in public data.",
+              children: null
+            },
+            {
+              name: "Non-metallic minerals (cement energy)",
+              pct: 2.2, abs: "~1.3 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Energy combustion for kiln heating only. Chemical process emissions from cement are counted separately under Industrial Processes.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Non-ferrous metals",
+              pct: 0.9, abs: "~0.5 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Aluminium smelting dominates (electrolysis, not combustion — included as energy equivalent).",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Paper, pulp & printing",
+              pct: 1.0, abs: "~0.6 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "med",
+              note: null,
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Food & tobacco processing",
+              pct: 1.0, abs: "~0.6 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "med",
+              note: null,
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Other industry (mining, construction, textiles…)",
+              pct: 7.4, abs: "~4.4 GtCO₂e",
+              source: "IEA (2022) — residual",
+              sourceRef: "[4]",
+              conf: "low",
+              note: "Residual category. Highly heterogeneous. No reliable global sub-breakdown available.",
+              color: C.energy,
+              stopReason: "No globally reconciled sub-breakdown at this level in public datasets.",
+              children: null
+            }
+          ]
+        },
+        {
+          name: "Energy use in buildings",
+          pct: 17.5, abs: "~10.3 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "high",
+          note: "Heating, cooling, cooking, lighting — direct energy combustion only (excludes electricity generation emissions, which sit in energy supply).",
+          color: C.energy,
+          stopReason: null,
+          children: [
+            {
+              name: "Residential buildings",
+              pct: 10.9, abs: "~6.4 GtCO₂e",
+              source: "IEA World Energy Outlook 2023",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Includes direct use of gas, oil, biomass for heating and cooking in homes.",
+              color: C.energy,
+              stopReason: "Further split (e.g. heating vs cooking vs hot water) is country-dependent with no global reconciliation.",
+              children: null
+            },
+            {
+              name: "Commercial & public buildings",
+              pct: 6.6, abs: "~3.9 GtCO₂e",
+              source: "IEA World Energy Outlook 2023",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Offices, retail, hospitals, schools.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            }
+          ]
+        },
+        {
+          name: "Energy use in transport",
+          pct: 16.2, abs: "~9.6 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "high",
+          note: "All fossil fuel combustion for movement of people and goods.",
+          color: C.energy,
+          stopReason: null,
+          children: [
+            {
+              name: "Road — passenger cars",
+              pct: 7.0, abs: "~4.1 GtCO₂e",
+              source: "Our World in Data / IEA (2020)",
+              sourceRef: "[3][4]",
+              conf: "med",
+              note: "Largest single transport source. Includes petrol and diesel cars. EVs excluded from this figure.",
+              color: C.energy,
+              stopReason: "Further drill (e.g. by engine type, geography) available in IEA but not globally reconciled publicly.",
+              children: null
+            },
+            {
+              name: "Road — trucks & buses",
+              pct: 4.0, abs: "~2.4 GtCO₂e",
+              source: "Our World in Data / IEA (2020)",
+              sourceRef: "[3][4]",
+              conf: "med",
+              note: "Heavy goods vehicles + public buses. Diesel-dominant globally.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Road — motorcycles & other",
+              pct: 0.9, abs: "~0.5 GtCO₂e",
+              source: "Our World in Data / IEA (2020)",
+              sourceRef: "[3][4]",
+              conf: "med",
+              note: "Two/three wheelers; significant in South and Southeast Asia.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Aviation",
+              pct: 1.9, abs: "~1.1 GtCO₂e",
+              source: "Our World in Data / ICAO (2019)",
+              sourceRef: "[3]",
+              conf: "med",
+              note: "Direct CO₂ from jet fuel. Does not include non-CO₂ warming effects (contrails, NOx), which may double the effective climate impact.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Shipping",
+              pct: 1.7, abs: "~1.0 GtCO₂e",
+              source: "IMO Fourth GHG Study 2020",
+              sourceRef: "[8]",
+              conf: "med",
+              note: "International + domestic maritime. Bunker fuel (HFO) dominant. IMO targets 50% reduction by 2050 vs 2008.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Rail",
+              pct: 0.4, abs: "~0.2 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "med",
+              note: "Diesel locomotives dominate in many regions; electric rail emissions flow through electricity generation.",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            },
+            {
+              name: "Pipeline transport",
+              pct: 0.3, abs: "~0.2 GtCO₂e",
+              source: "IEA (2022)",
+              sourceRef: "[4]",
+              conf: "low",
+              note: "Energy used to pump oil/gas through pipelines. Methodologically distinct from fugitive methane leaks (counted in Fugitive Emissions).",
+              color: C.energy,
+              stopReason: null,
+              children: null
+            }
+          ]
+        },
+        {
+          name: "Other fuel combustion",
+          pct: 7.8, abs: "~4.6 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "med",
+          note: "Includes electricity and heat generation losses, military combustion, cooking biomass. Partially overlaps with residential if energy system boundary differs.",
+          color: C.energy,
+          stopReason: "Category is a residual across national accounting systems. Sub-splits not reconcilable globally.",
+          children: null
+        },
+        {
+          name: "Fugitive emissions from energy",
+          pct: 5.8, abs: "~3.4 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "med",
+          note: "Methane leaks from coal mines, oil/gas wells, pipelines, LNG terminals. Highly uncertain — satellite data (e.g. MethaneSAT, TROPOMI) increasingly revising estimates upward.",
+          color: C.energy,
+          stopReason: "Sub-split (gas vs coal vs oil) exists in IEA/UNEP but confidence varies significantly by region and measurement method.",
+          children: null
+        },
+        {
+          name: "Energy in agriculture & fishing",
+          pct: 1.7, abs: "~1.0 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2][3]",
+          conf: "med",
+          note: "Fuel for tractors, irrigation pumps, fishing vessels, cold chain. Distinct from agricultural process emissions (those sit in AFOLU).",
+          color: C.energy,
+          stopReason: null,
+          children: null
+        }
+      ]
+    },
+    {
+      name: "Agriculture, Forestry & Land Use (AFOLU)",
+      pct: 18.4, abs: "~10.9 GtCO₂e",
+      source: "Climate Watch / WRI (2019) + FAO FAOSTAT",
+      sourceRef: "[2][3][6]",
+      conf: "high",
+      note: "Biological and land-management emissions. Includes CO₂ from land use change, CH₄ from livestock/rice, N₂O from soils.",
+      color: C.afolu,
+      stopReason: null,
+      children: [
+        {
+          name: "Livestock & manure",
+          pct: 5.8, abs: "~3.4 GtCO₂e",
+          source: "Climate Watch / WRI (2019); FAO FAOSTAT (2021)",
+          sourceRef: "[2][6]",
+          conf: "high",
+          note: "Largest agricultural source globally. Dominated by cattle.",
+          color: C.afolu,
+          stopReason: null,
+          children: [
+            {
+              name: "Enteric fermentation (cattle)",
+              pct: 3.7, abs: "~2.2 GtCO₂e",
+              source: "FAO FAOSTAT (2021)",
+              sourceRef: "[6]",
+              conf: "med",
+              note: "Methane from microbial fermentation in ruminant digestive systems. Beef cattle dominate over dairy.",
+              color: C.afolu,
+              stopReason: "FAO has country-level and some species-level data, but globally reconciled sub-species breakdown (beef vs dairy vs sheep) has significant uncertainty.",
+              children: null
+            },
+            {
+              name: "Manure management",
+              pct: 2.1, abs: "~1.2 GtCO₂e",
+              source: "FAO FAOSTAT (2021)",
+              sourceRef: "[6]",
+              conf: "med",
+              note: "CH₄ and N₂O from decomposition and storage of animal manure. Highly dependent on management system (lagoons vs composting vs direct deposit).",
+              color: C.afolu,
+              stopReason: null,
+              children: null
+            }
+          ]
+        },
+        {
+          name: "Agricultural soils",
+          pct: 4.1, abs: "~2.4 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2]",
+          conf: "med",
+          note: "N₂O from synthetic and organic nitrogen fertilizers applied to soils. Second-largest agricultural source.",
+          color: C.afolu,
+          stopReason: "Country-level estimates vary widely due to soil type, climate, and measurement methodology. Global sub-split (synthetic vs organic fertilizer) not robustly reconciled.",
+          children: null
+        },
+        {
+          name: "Crop burning",
+          pct: 3.5, abs: "~2.1 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2]",
+          conf: "med",
+          note: "Includes burning of crop residues after harvest AND savanna / grassland burning for land management. CO₂, CH₄, and N₂O.",
+          color: C.afolu,
+          stopReason: null,
+          children: null
+        },
+        {
+          name: "Deforestation",
+          pct: 2.2, abs: "~1.3 GtCO₂e",
+          source: "Global Carbon Project (2022); Harris et al. 2021 (Science)",
+          sourceRef: "[5]",
+          conf: "med",
+          note: "Net CO₂ from permanent forest loss. Amazon, Southeast Asia, and Congo Basin dominate. Note: this excludes forest regrowth (which absorbs CO₂) — net land sink is a separate accounting layer.",
+          color: C.afolu,
+          stopReason: "Satellite-based estimates (Global Forest Watch, Hansen et al.) give annual change but reconciliation with national inventories remains challenging.",
+          children: null
+        },
+        {
+          name: "Cropland management",
+          pct: 1.4, abs: "~0.8 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2]",
+          conf: "med",
+          note: "CO₂ from soil carbon changes when converting land to/from cropland and from tillage practices.",
+          color: C.afolu,
+          stopReason: null,
+          children: null
+        },
+        {
+          name: "Rice cultivation",
+          pct: 1.3, abs: "~0.8 GtCO₂e",
+          source: "Climate Watch / WRI (2019); FAO",
+          sourceRef: "[2][6]",
+          conf: "med",
+          note: "CH₄ from anaerobic decomposition in flooded rice paddies. Asia (China, India, Bangladesh) accounts for ~90%.",
+          color: C.afolu,
+          stopReason: null,
+          children: null
+        },
+        {
+          name: "Other AFOLU",
+          pct: 0.1, abs: "~0.1 GtCO₂e",
+          source: "Climate Watch / WRI — residual",
+          sourceRef: "[2]",
+          conf: "low",
+          note: "Peatland degradation, organic soil drainage, and other land-use categories. Residual.",
+          color: C.afolu,
+          stopReason: "Residual category — not further resolvable with public globally reconciled data.",
+          children: null
+        }
+      ]
+    },
+    {
+      name: "Industrial Processes",
+      pct: 5.2, abs: "~3.1 GtCO₂e",
+      source: "Climate Watch / WRI (2019)",
+      sourceRef: "[2]",
+      conf: "high",
+      note: "Chemical reactions during production — NOT combustion. These emissions cannot be eliminated by switching to clean electricity.",
+      color: C.industry,
+      stopReason: null,
+      children: [
+        {
+          name: "Cement (calcination)",
+          pct: 3.0, abs: "~1.8 GtCO₂e",
+          source: "GCCA Getting the Numbers Right (2022); IEA",
+          sourceRef: "[4][7]",
+          conf: "high",
+          note: "CO₂ released when limestone (CaCO₃) is heated to produce lime (CaO). ~60% of cement's total footprint. Unavoidable with current chemistry — only carbon capture or clinker substitutes can address it.",
+          color: C.industry,
+          stopReason: "Sub-split by country/plant is in GCCA dataset but global reconciliation to a single % is already at this level's confidence ceiling.",
+          children: null
+        },
+        {
+          name: "Chemicals (process emissions)",
+          pct: 2.2, abs: "~1.3 GtCO₂e",
+          source: "Climate Watch / WRI (2019); ICCA",
+          sourceRef: "[2]",
+          conf: "med",
+          note: "Includes N₂O from nitric and adipic acid production, CO₂ from methanol and ammonia synthesis, and HFCs/PFCs from semiconductor/refrigerant production.",
+          color: C.industry,
+          stopReason: "Chemical sub-sector breakdown (ammonia vs nitric acid vs fluorochemicals) exists in IPCC inventory guidelines but not globally reconciled in a single public dataset.",
+          children: null
+        }
+      ]
+    },
+    {
+      name: "Waste",
+      pct: 3.2, abs: "~1.9 GtCO₂e",
+      source: "Climate Watch / WRI (2019)",
+      sourceRef: "[2]",
+      conf: "high",
+      note: "Emissions from disposal and treatment of solid and liquid waste. Dominated by methane.",
+      color: C.waste,
+      stopReason: null,
+      children: [
+        {
+          name: "Landfills",
+          pct: 1.9, abs: "~1.1 GtCO₂e",
+          source: "Climate Watch / WRI (2019); IPCC AR6",
+          sourceRef: "[1][2]",
+          conf: "med",
+          note: "CH₄ from anaerobic decomposition of organic waste in landfills. Large variance by country depending on landfill gas capture.",
+          color: C.waste,
+          stopReason: "Sub-split by waste type (food vs paper vs other organic) not globally reconciled.",
+          children: null
+        },
+        {
+          name: "Wastewater treatment",
+          pct: 1.3, abs: "~0.8 GtCO₂e",
+          source: "Climate Watch / WRI (2019)",
+          sourceRef: "[2]",
+          conf: "med",
+          note: "CH₄ and N₂O from treatment and discharge of domestic and industrial wastewater. Higher in lower-income countries with open/anaerobic systems.",
+          color: C.waste,
+          stopReason: null,
+          children: null
+        }
+      ]
+    }
+  ]
+};
+
+let nodeId = 0;
+
+function getConfClass(conf) {
+  return conf === 'high' ? 'conf-high' : conf === 'med' ? 'conf-med' : 'conf-low';
+}
+
+function getConfLabel(conf) {
+  return conf === 'high' ? 'HIGH' : conf === 'med' ? 'MED' : 'LOW';
+}
+
+function buildNode(node, isRoot = false) {
+  const id = nodeId++;
+  const hasChildren = node.children && node.children.length > 0;
+  const pctOfParent = node.pct;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'node-wrapper' + (isRoot ? ' root-node' : ' child-node');
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'node-header' + (isRoot ? ' expanded' : '');
+  header.style.setProperty('--node-color', node.color);
+  header.querySelector ? null : null;
+
+  // Color bar
+  const colorBar = document.createElement('div');
+  colorBar.className = 'node-color-bar';
+  colorBar.style.background = node.color;
+  header.style.cssText += `--node-color: ${node.color};`;
+  // make the ::before use the color
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `.node-header-${id}::before { background: ${node.color}; }`;
+  document.head.appendChild(styleEl);
+  header.classList.add(`node-header-${id}`);
+
+  // Expand btn or leaf indicator
+  const btn = document.createElement('div');
+  if (hasChildren) {
+    btn.className = 'expand-btn';
+    btn.innerHTML = isRoot ? '−' : '+';
+  } else {
+    btn.className = 'no-children-indicator';
+    btn.innerHTML = '●';
+  }
+
+  header.appendChild(btn);
+  header.appendChild(colorBar);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'node-name';
+  nameEl.textContent = node.name;
+  header.appendChild(nameEl);
+
+  // Bar
+  const barWrapper = document.createElement('div');
+  barWrapper.className = 'node-bar-wrapper';
+  const barFill = document.createElement('div');
+  barFill.className = 'node-bar-fill';
+  barFill.style.width = Math.min(pctOfParent, 100) + '%';
+  barFill.style.background = node.color;
+  barWrapper.appendChild(barFill);
+  header.appendChild(barWrapper);
+
+  const pctEl = document.createElement('div');
+  pctEl.className = 'node-pct';
+  pctEl.style.color = node.color;
+  pctEl.textContent = pctOfParent.toFixed(1) + '%';
+  header.appendChild(pctEl);
+
+  const confBadge = document.createElement('div');
+  confBadge.className = 'conf-badge ' + getConfClass(node.conf);
+  confBadge.textContent = getConfLabel(node.conf);
+  header.appendChild(confBadge);
+
+  wrapper.appendChild(header);
+
+  // Detail panel
+  const detail = document.createElement('div');
+  detail.className = 'node-detail' + (isRoot ? ' visible' : '');
+  detail.id = 'detail-' + id;
+
+  const grid = document.createElement('div');
+  grid.className = 'detail-grid';
+
+  const fields = [
+    { label: 'Absolute estimate', val: node.abs },
+    { label: 'Data source', val: node.source + ' ' + (node.sourceRef || '') },
+    { label: '% of global GHGs', val: pctOfParent.toFixed(2) + '%' },
+    node.note ? { label: 'Notes', val: node.note } : null
+  ].filter(Boolean);
+
+  fields.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'detail-item';
+    item.innerHTML = `<label>${f.label}</label><span>${f.val}</span>`;
+    grid.appendChild(item);
+  });
+
+  detail.appendChild(grid);
+
+  if (node.stopReason) {
+    const stop = document.createElement('div');
+    stop.className = 'stop-note';
+    stop.innerHTML = `<span>⛔</span><span><strong>Data stops here:</strong> ${node.stopReason}</span>`;
+    detail.appendChild(stop);
+  }
+
+  wrapper.appendChild(detail);
+
+  // Children
+  if (hasChildren) {
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'node-children' + (isRoot ? ' visible' : '');
+    childrenContainer.id = 'children-' + id;
+
+    node.children.forEach(child => {
+      childrenContainer.appendChild(buildNode(child, false));
+    });
+
+    wrapper.appendChild(childrenContainer);
+
+    header.addEventListener('click', () => {
+      const expanded = header.classList.contains('expanded');
+      if (expanded) {
+        header.classList.remove('expanded');
+        detail.classList.remove('visible');
+        childrenContainer.classList.remove('visible');
+        btn.innerHTML = '+';
+      } else {
+        header.classList.add('expanded');
+        detail.classList.add('visible');
+        childrenContainer.classList.add('visible');
+        btn.innerHTML = '−';
+      }
+    });
+  } else {
+    header.addEventListener('click', () => {
+      const expanded = header.classList.contains('expanded');
+      if (expanded) {
+        header.classList.remove('expanded');
+        detail.classList.remove('visible');
+      } else {
+        header.classList.add('expanded');
+        detail.classList.add('visible');
+      }
+    });
+  }
+
+  return wrapper;
+}
+
+function togglePanel(id, btn) {
+  const el = document.getElementById(id);
+  const isVisible = el.classList.contains('visible');
+  el.classList.toggle('visible');
+  const arrow = btn.querySelector('span');
+  if (arrow) arrow.textContent = isVisible ? '▶' : '▼';
+}
+
+// Mount
+const root = document.getElementById('tree-root');
+root.appendChild(buildNode(TREE, true));
+</script>
+</body>
+</html>
